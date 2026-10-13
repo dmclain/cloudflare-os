@@ -41,6 +41,15 @@ cleanup. Prefer bounded overrides; disable only when an outer job or operator su
 A timeout exits 124 and names the idle/total limit, command, and surviving process tree. Exit 137
 alone does not prove OOM; inspect the primary failure and available memory diagnostics.
 
+## Workshop backend isolation
+
+Most workshop-backend test files share one module graph and one Miniflare per Vitest worker
+(`isolate: false` in its `vitest.config.ts`), because reloading the graph for every file dominated
+the suite's run time. Module state and Durable Object, R2 and span-recorder storage carry over
+between files in a worker, so give storage unique names: random ids, or names prefixed with the
+test file's. Files that call `vi.mock` or `vi.doMock` run isolated automatically, since a mock
+cannot replace a module the shared graph already loaded.
+
 ## Workerd and resource pressure
 
 The root test launcher computes task concurrency and a Vitest worker budget in

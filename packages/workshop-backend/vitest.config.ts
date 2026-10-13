@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import type { Plugin } from 'vite'
 import { defineConfig } from 'vitest/config'
@@ -58,6 +58,17 @@ export default {
 };
 `
 
+const TESTS_DIR = path.join(import.meta.dirname, '__tests__')
+
+/**
+ * The test files that mock a module (`vi.mock`, `vi.doMock`). A mock cannot replace a module the
+ * module graph already holds, so these keep vitest's per-file isolation (see `projects` below).
+ */
+const MOCKING_FILES = readdirSync(TESTS_DIR)
+  .filter((name) => name.endsWith('.test.ts'))
+  .filter((name) => /\bvi\.(mock|doMock)\b/.test(readFileSync(path.join(TESTS_DIR, name), 'utf-8')))
+  .map((name) => `__tests__/${name}`)
+
 /**
  * Tests run inside workerd (via vitest-pool-workers) so they exercise the same runtime APIs as
  * production -- e.g. Uint8Array.toHex/fromHex and crypto.subtle used by the sharing module. Most
@@ -104,8 +115,18 @@ export default defineConfig({
     }),
   ],
   test: {
-    include: ['__tests__/*.test.ts'],
     // Asserts the pool actually started, rather than trusting a green run to mean workerd.
     setupFiles: ['@gadgets/scripts/assert-workerd'],
+    // Reloading the backend's module graph for every file was most of this suite's run time, so
+    // the files that mock nothing share one graph and one Miniflare per worker. Module state and
+    // Durable Object, R2 and span-recorder storage carry over between them: name storage uniquely.
+    // `include` stays out of the root config, since `extends: true` appends it to each project's.
+    projects: [
+      {
+        extends: true,
+        test: { name: 'shared', include: ['__tests__/*.test.ts'], exclude: MOCKING_FILES, isolate: false },
+      },
+      { extends: true, test: { name: 'isolated', include: MOCKING_FILES } },
+    ],
   },
 })
