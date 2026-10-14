@@ -32,6 +32,7 @@ import {
   WorktreeSummary,
   BlueprintOutput,
   WorkpiecesSubscriber,
+  UserNotification,
 } from '@gadgets/workshop-shared/api'
 import ObserverConfigModal from './ObserverConfigModal'
 import WorkpieceCodeInterface from './features/code/WorkpieceCodeInterface'
@@ -60,6 +61,8 @@ import BlueprintModal from './BlueprintModal'
 import { UpdateFromBlueprintDialog } from './features/blueprint-updates/UpdateFromBlueprintDialog'
 import { useBlueprintUpdateAvailable } from './features/blueprint-updates/useBlueprintUpdateAvailable'
 import { reportVisibleChat } from './features/notifications/visibleChat'
+import { WorkspaceNotificationsMenu } from './features/notifications/WorkspaceNotificationsMenu'
+import { logRpcFailure } from './rpcErrors'
 import TopBarNotice from './TopBarNotice'
 import { WorkshopButton, WorkshopIconButton, WorkshopInput } from './components/WorkshopControls'
 import { useActionEntries, useActions } from './useActions'
@@ -1405,6 +1408,25 @@ export default function GadgetEditor() {
     authenticatedApi.whoami().then(setUserInfo).catch(() => {})
   }, [authenticatedApi])
 
+  // ── notification settings ─────────────────────────────────────────────────────
+  // The user's per-workspace notification settings live on the workspace's record in their own
+  // list, which the Overseer's metadata doesn't carry. Tagged with their workspace because a
+  // toast's "Open task" navigates between workspaces without remounting the editor.
+  const [notificationSettings, setNotificationSettings] =
+    useState<{ workspaceId: string, disabledKinds?: UserNotification['kind'][] }>()
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+    authenticatedApi.listGadgets().then(gadgets => {
+      if (cancelled) return
+      setNotificationSettings({
+        workspaceId: id,
+        disabledKinds: gadgets.find(gadget => gadget.id === id)?.disabledNotificationKinds,
+      })
+    }, error => logRpcFailure('Failed to load workspace notification settings:', error))
+    return () => { cancelled = true }
+  }, [authenticatedApi, id])
+
   // ── title save/cancel ─────────────────────────────────────────────────────────
   const titleSaveInFlight = useRef(false)
   const handleSaveTitle = async () => {
@@ -1791,6 +1813,14 @@ export default function GadgetEditor() {
             <DropdownMenu.Item onClick={() => setShareModalOpen(true)} className={MENU_ITEM}>
               Share workspace
             </DropdownMenu.Item>
+            {notificationSettings && notificationSettings.workspaceId === id && (
+              <WorkspaceNotificationsMenu
+                workspaceId={notificationSettings.workspaceId}
+                disabledKinds={notificationSettings.disabledKinds}
+                onDisabledKindsChange={disabledKinds => setNotificationSettings(prev =>
+                  prev?.workspaceId === notificationSettings.workspaceId ? { ...prev, disabledKinds } : prev)}
+              />
+            )}
             {/* App-only actions are left out for a worktree rather than shown disabled, as the
                 desktop header leaves out its full-screen button. */}
             {selectedWorkpieceSummary?.type !== 'worktree' && (

@@ -1,10 +1,11 @@
 import { Link } from '@tanstack/react-router'
-import { Clock, MagnifyingGlass, Hexagon, DotsThreeVertical, ShareNetwork, Trash, Info, Star, Pencil, ArrowRight } from '@phosphor-icons/react'
+import { BellSlash, Clock, MagnifyingGlass, Hexagon, DotsThreeVertical, ShareNetwork, Trash, Info, Star, Pencil, ArrowRight } from '@phosphor-icons/react'
 import { useState, useEffect, useRef } from 'react'
 import { DropdownMenu, Dialog, Button, useKumoToastManager } from '@cloudflare/kumo'
 import { RpcStub } from 'capnweb'
 import { useAuthenticatedApi } from '../AuthContext'
-import { GadgetMetadataWithTimestamps, BlueprintPublicInfo, Overseer, AiChatAuthorInfo } from '@gadgets/workshop-shared/api'
+import { GadgetMetadataWithTimestamps, BlueprintPublicInfo, Overseer, AiChatAuthorInfo, UserNotification } from '@gadgets/workshop-shared/api'
+import { WorkspaceNotificationsMenu } from '../features/notifications/WorkspaceNotificationsMenu'
 import ShareModal from '../ShareModal'
 import { BindingBadge, getGradient as getBlueprintGradient, uniqueBindingBadges } from './BlueprintCard'
 import { MENU_CONTENT, MENU_ITEM, MENU_ITEM_DANGER } from './menuStyles'
@@ -42,6 +43,7 @@ function AppRow({
   onInfo,
   onTogglePin,
   onRename,
+  onNotificationKindsChange,
 }: {
   gadget: GadgetMetadataWithTimestamps
   onDelete: (gadget: GadgetMetadataWithTimestamps) => void
@@ -49,6 +51,7 @@ function AppRow({
   onInfo: (gadget: GadgetMetadataWithTimestamps) => void
   onTogglePin: (gadget: GadgetMetadataWithTimestamps) => void
   onRename: (gadget: GadgetMetadataWithTimestamps, newTitle: string) => void
+  onNotificationKindsChange: (gadget: GadgetMetadataWithTimestamps, disabledKinds: UserNotification['kind'][]) => void
 }) {
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(gadget.title || '')
@@ -109,6 +112,9 @@ function AppRow({
               {gadget.title || 'Untitled Workspace'}
             </h3>
           )}
+          {!!gadget.disabledNotificationKinds?.length && (
+            <BellSlash size={12} alt="Some notifications off" className="text-kumo-inactive flex-shrink-0" />
+          )}
         </div>
         {gadget.owner && (
           <p className="text-xs text-kumo-subtle truncate mt-0.5">
@@ -152,6 +158,11 @@ function AppRow({
             <ShareNetwork size={13} className="mr-2" />
             Share
           </DropdownMenu.Item>
+          <WorkspaceNotificationsMenu
+            workspaceId={gadget.id}
+            disabledKinds={gadget.disabledNotificationKinds}
+            onDisabledKindsChange={kinds => onNotificationKindsChange(gadget, kinds)}
+          />
           <DropdownMenu.Separator />
           <DropdownMenu.Item
             variant="danger"
@@ -321,6 +332,9 @@ export default function GadgetList({ showHeader = true }: { showHeader?: boolean
     }
   }
 
+  const handleNotificationKindsChange = (gadget: GadgetMetadataWithTimestamps, disabledKinds: UserNotification['kind'][]) =>
+    setGadgets(prev => prev.map(g => g.id === gadget.id ? { ...g, disabledNotificationKinds: disabledKinds } : g))
+
   const handleShareClose = () => {
     setShareTarget(null)
   }
@@ -398,6 +412,7 @@ export default function GadgetList({ showHeader = true }: { showHeader?: boolean
               onInfo={setInfoTarget}
               onTogglePin={handleTogglePin}
               onRename={handleRename}
+              onNotificationKindsChange={handleNotificationKindsChange}
             />
           ))
         )}
