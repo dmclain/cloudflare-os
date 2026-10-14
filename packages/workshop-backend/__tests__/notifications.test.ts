@@ -134,12 +134,12 @@ describe("notification service", () => {
 
 // RPC exposes prototype methods only, as the browser's NotificationSubscriberImpl defines them.
 class Subscriber extends RpcTarget {
-  constructor(private readonly answer: () => Promise<void>) {
+  constructor(private readonly answer: (notification: UserNotification) => Promise<void>) {
     super();
   }
 
-  notify(): Promise<void> {
-    return this.answer();
+  notify(notification: UserNotification): Promise<void> {
+    return this.answer(notification);
   }
 }
 
@@ -189,6 +189,39 @@ describe("UserDurableObject notifications", () => {
   it("pushes to the registered phone when the tab does not answer within 3s", async () => {
     vi.useFakeTimers();
     expect(await publish(() => new Promise<void>(() => {}))).toEqual([ONE]);
+  });
+
+  // An hourly automation keeps asking: turning its kind off in that workspace silences only that.
+  it("sends a kind turned off for its workspace to no tab or device until turned back on",
+      async () => {
+    let fetcher = stubService();
+    let offered: string[] = [];
+    let automation = { ...NOTIFICATION, kind: "automationPermissionRequested" } as const;
+    let elsewhere = { ...automation, workspaceId: "def456" };
+    await inUser(async user => {
+      await user.newGadget(NOTIFICATION.workspaceId, NOTIFICATION.chatTitle);
+      await user.registerNotificationDevice("a".repeat(64));
+      // A hidden tab: offered everything, shows nothing, so each offer also falls back to push.
+      await user.subscribeToNotifications(new RpcStub(new Subscriber(async notification => {
+        offered.push(`${notification.workspaceId} ${notification.kind}`);
+        throw new Error("hidden");
+      })) as unknown as RpcStub<NotificationSubscriber>);
+      await user.setWorkspaceNotificationKindEnabled(
+          NOTIFICATION.workspaceId, automation.kind, false);
+      for (let notification of [automation, NOTIFICATION, elsewhere]) {
+        await user.publishNotification(notification);
+      }
+      await user.setWorkspaceNotificationKindEnabled(
+          NOTIFICATION.workspaceId, automation.kind, true);
+      await user.publishNotification(automation);
+    });
+    expect(offered).toEqual([
+      "abc123 taskCompleted",
+      "def456 automationPermissionRequested",
+      "abc123 automationPermissionRequested",
+    ]);
+    expect(bodies(fetcher, "/v1/deliveries").map(({ taskId }) => taskId))
+        .toEqual(["abc123:7", "def456:7", "abc123:7"]);
   });
 
   it("pushes to each device's latest subscription", async () => {

@@ -488,9 +488,14 @@ describe("turn notifications", () => {
     { state: "pending", when: "during its step", kind: "permissionRequested" },
     { state: "rejected", when: "during its step", kind: "taskCompleted" },
     { state: "rejected", when: "as its step persists", kind: "taskCompleted" },
+    {
+      state: "pending", when: "during a spawned agent's step",
+      kind: "automationPermissionRequested",
+      initiator: { type: "gadget", id: "spawner", name: "Spawner" },
+    },
   ] as const)("sends $kind when the awaited action is $state $when",
-      async ({ state, when, kind }) => {
-    let turn = startTurn([reply]);
+      async ({ state, when, kind, initiator }) => {
+    let turn = startTurn([reply], { initiator });
     await turn.requested;
     await inOverseer(turn.workspace, async impl => {
       impl.storage.gatekeepers.put({

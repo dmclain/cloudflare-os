@@ -183,8 +183,12 @@ export type UserNotification = {
   /** Stable identifier shared by the live and push delivery attempts. */
   id: string;
 
-  /** Whether the task finished or is paused on a connection or action-approval prompt. */
-  kind: "taskCompleted" | "permissionRequested";
+  /**
+   * Whether the task finished, or is paused on a connection or action-approval prompt in a turn a
+   * person started (`permissionRequested`) or in an unattended one, such as a callback or a
+   * spawned agent (`automationPermissionRequested`).
+   */
+  kind: "taskCompleted" | "permissionRequested" | "automationPermissionRequested";
 
   /** Workspace containing the task. */
   workspaceId: string;
@@ -519,6 +523,14 @@ export interface AuthenticatedApi extends RpcTarget {
    */
   subscribeToNotifications(
       subscriber: RpcStub<NotificationSubscriber>): Promise<RpcStub<{}>>;
+
+  /**
+   * Turn one kind of notification from a workspace in the user's list on or off, on every tab and
+   * device. Returns the workspace's `disabledNotificationKinds` after the change.
+   */
+  setWorkspaceNotificationKindEnabled(
+      workspaceId: string, kind: UserNotification["kind"], enabled: boolean)
+      : Promise<UserNotification["kind"][]>;
 
   /**
    * List the user's configured AI models of one kind, by default the language models, which can
@@ -2006,6 +2018,9 @@ export type GadgetMetadata = {
 
   /** Whether the user has pinned this gadget to the top of their list. */
   pinned?: boolean;
+
+  /** Kinds of notification the user turned off for this workspace; they reach no tab or device. */
+  disabledNotificationKinds?: UserNotification["kind"][];
 
   /**
    * Set when the gadget is not owned by the current user. Presence of this field indicates the

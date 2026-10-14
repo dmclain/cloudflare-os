@@ -103,10 +103,18 @@ User DO reset drops its subscription. When the service answers `device_gone` or
 `invalid_subscription`, the User DO drops that subscription; the device subscribes again when its
 app next opens. Any other failure, including `invalid_signature`, keeps it. Only turns a person
 started announce completion; callback turns, such as a schedule, and spawned agents notify only
-when they need the user's permission. A turn that an approval or accepted connection resumes
-belongs to whoever decided: it runs on their model and account, so its notifications go to them.
+when they need the user's permission, as `automationPermissionRequested` rather than
+`permissionRequested`. Both use the service's `permission_requested` template. A turn that an
+approval or accepted connection resumes belongs to whoever decided: it runs on their model and
+account, so its notifications go to them.
 The deep link opens the chat with `showChat`, which leaves full-screen preview and switches a phone
 showing the workspace's app to the chat.
+
+A user can turn each kind off for one workspace from its menu in the sidebar, the workspace list,
+or the editor's menu on a phone. The setting lives on that workspace's record in the user's own
+User DO (`disabledNotificationKinds`), so it applies only to them and is deleted with the record.
+The User DO checks it before offering a notification to any tab, so a kind turned off reaches no
+tab and no device.
 
 ## Deployment contract
 

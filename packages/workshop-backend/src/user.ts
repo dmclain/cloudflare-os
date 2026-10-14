@@ -485,11 +485,25 @@ export class UserDurableObject extends DurableObject<Cloudflare.Env> {
     return new RpcStub<{}>({ [Symbol.dispose]: unsubscribe });
   }
 
+  /** See `AuthenticatedApi.setWorkspaceNotificationKindEnabled()`. */
+  async setWorkspaceNotificationKindEnabled(
+      workspaceId: string, kind: UserNotification["kind"], enabled: boolean)
+      : Promise<UserNotification["kind"][]> {
+    let record = this.storage.gadgets.get(workspaceId);
+    if (!record) throw new Error("No such workspace belonging to user.");
+    let others = record.disabledNotificationKinds?.filter(disabled => disabled !== kind) ?? [];
+    record.disabledNotificationKinds = enabled ? others : [...others, kind];
+    this.storage.gadgets.put(record);
+    return record.disabledNotificationKinds;
+  }
+
   /**
    * Offer a notification to visible clients; push it to every registered device unless one
-   * acknowledges within 3s.
+   * acknowledges within 3s. A kind the user turned off for its workspace goes nowhere.
    */
   async publishNotification(notification: UserNotification): Promise<void> {
+    let disabled = this.storage.gadgets.get(notification.workspaceId)?.disabledNotificationKinds;
+    if (disabled?.includes(notification.kind)) return;
     let timeout: ReturnType<typeof setTimeout> | undefined;
     let acknowledged = await Promise.race([
       Promise.any([...this.#notificationSubscribers.values()]

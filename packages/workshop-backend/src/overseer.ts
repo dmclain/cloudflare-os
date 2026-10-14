@@ -6723,7 +6723,9 @@ class OverseerImpl implements AgentHooks {
           this.ctx.waitUntil(this.users.get(this.users.idFromString(initiatorUserId))
               .publishNotification({
                 id: crypto.randomUUID(),
-                kind: awaitingDecision ? "permissionRequested" : "taskCompleted",
+                kind: !awaitingDecision ? "taskCompleted"
+                    : initiator.type === "user" ? "permissionRequested"
+                    : "automationPermissionRequested",
                 workspaceId: this.ctx.id.toString(),
                 chatId,
                 chatTitle: meta.title,
